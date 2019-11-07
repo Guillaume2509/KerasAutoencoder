@@ -11,8 +11,7 @@ Il est composé des portions suivantes:
     1c) Détermination des réductions de composantes souhaitées
     1d) Importation et assignation du jeu de données en jeux de tests et d'entraînement
     1e) Échantillonnage (90 000 rangées) des variables d'essaie et de test
-2) Préprocession du jeu de données en tenseurs de bonne forme pour le réseau de neuronnes 
-3) Construction du réseau de neurones 
+2) Construction du réseau de neurones 
 
 Historique:
 Code initial: 2019/29/10: Création du code par Guillaume Giroux
@@ -30,15 +29,15 @@ import matplotlib.pyplot as plt
 
 
 # 1b) Établissement des variables d'extraction et de sauvegarde des données
-sourceFilename = r'C:\Users\u3782\Documents\perDiem-Slave\analytique\resultats\ScaledDatabaseOHE-robustSc-20191025.pkl'
-networkSavePath = r'C:\Users\u3782\Documents'
+sourceFilename = r'K:\27000\_Projet_Information_de_gestion\Analytique\Intelligence Artificielle\ScaledDatabaseOHE-robustSc-20191025.pkl'
+networkSavePath = r'K:\27000\_Projet_Information_de_gestion\Analytique\Intelligence Artificielle\AutoencoderNetwork'
 
 
 # 1c) Détermination des réductions de composantes souhaitées et paramètres
 # du réseau neuronal
-composantesReduites = 24
-batch_size = 30000
-epochs = 1
+composantesReduites = [2, 4, 8, 12, 18, 24, 36, 42, 83, 166]
+batch_size = 10 # Mettre une puissance de 2 optimiser sur GPU
+epochs = 400
 loss = 'mean_squared_error'
 
 
@@ -51,28 +50,21 @@ f.close()
 
 
 #%%
-# 1e) Échantillonnage (90 000 rangées) des variables d'essaie et de test
-Xs_train = Xs_train.sample(n=90000, random_state=42)
-Y_train = Y_train.sample(n=90000, random_state=42)
-Xs_test = Xs_test.sample(n=90000, random_state=42)
-Y_test = Y_test.sample(n=90000, random_state=42)
+# 1e) Échantillonnage (180 000 rangées) des variables d'essaie et de test
+Xs_train = Xs_train.sample(n=1800, random_state=42)
+Y_train = Y_train.sample(n=1800, random_state=42)
+Xs_test = Xs_test.sample(n=1800, random_state=42)
+Y_test = Y_test.sample(n=180000, random_state=42)
 
 
 print('Fin partie 1')
 
 
 #%%
-# 2) Préprocession du jeu de données en tenseurs de bonne forme pour le réseau de neuronnes ===================================================================================
-'''dataset = tf.data.Dataset.from_tensor_slices((Xs_train.values, Y_train.values))
-train_dataset = dataset'''
-
-print('Fin partie 2')
-
-
-#%%
-# 3) Construction du réseau de neurones ===========================================================================================================================================
-epochs=20
-
+# 2) Construction du réseau de neurones ===========================================================================================================================================
+# 2a) Construction du réseau de neurones
+import time
+tic = time.time()
 def get_compiled_model(dimensions=100):
     model = keras.Sequential([
         keras.layers.Dense(len(Xs_train.columns), input_shape=(len(Xs_train.columns),), activation='relu'),
@@ -82,49 +74,30 @@ def get_compiled_model(dimensions=100):
 
     model.compile(optimizer='adam',
                 loss=loss,
-                metrics=['accuracy'])
+                metrics=['acc'])
     return model
 
 
-model = get_compiled_model(dimensions=composantesReduites)
-es = keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=200)
-mc = keras.callbacks.ModelCheckpoint(networkSavePath, monitor='val_accuracy', mode='max', verbose=1, save_best_only=True)
-history = model.fit(Xs_train, Xs_train, validation_split=0.15, batch_size=batch_size, epochs=epochs, callbacks=[es, mc])
+# 2b) Application du réseau sur chaque choix de réduction de composante
+for middleLayer in composantesReduites:
+    model = get_compiled_model(dimensions=middleLayer)
+    es = keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', min_delta=0.001, verbose=1, patience=20)
+    savePath = networkSavePath + str(middleLayer) + 'dimensions.h5'
+    mc = keras.callbacks.ModelCheckpoint(savePath, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
+    history = model.fit(Xs_train, Xs_train, validation_split=0.15, batch_size=batch_size, epochs=epochs, callbacks=[es, mc])
 
+    toc = time.time()
+    print(toc - tic)
 
-#%%
-# evaluate the model
-_, train_acc = model.evaluate(Xs_train, Xs_train, verbose=0)
-_, test_acc = model.evaluate(Xs_test, Xs_test, verbose=0)
-print('Train: %.3f, Test: %.3f' % (train_acc, test_acc))
-# plot training history
-plt.plot(history.history['loss'], label='train')
-plt.plot(history.history['val_loss'], label='test')
-plt.legend()
-plt.show()
+    # evaluate the model
+    _, train_acc = model.evaluate(Xs_train, Xs_train, verbose=0)
+    _, test_acc = model.evaluate(Xs_test, Xs_test, verbose=0)
+    print('Train: %.3f, Test: %.3f' % (train_acc, test_acc))
+    # plot training history
+    plt.plot(history.history['loss'], label='train')
+    plt.plot(history.history['val_loss'], label='test')
+    plt.legend()
+    plt.show()
 
-
-
-#%%
-MSEloss = history.history['loss']
-accuracy = history.history['accuracy']
-
-print("Test loss" + str(MSEloss))
-print("Test accuracy" + str(accuracy))
-
-print('Fin partie 3')
-
-'''# %%
-plt.style.use('ggplot')
-
-plt.scatter(composantesReduites, MSEloss[0], color='slateblue')
-
-plt.title('MSE en fonction du nombre de dimensions retenues à epochs=1')
-plt.xlabel('Nombre de dimensions retenues')
-plt.ylabel('MSE')
-
-
-
-plt.show()'''
 
 # %%
