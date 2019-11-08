@@ -10,7 +10,7 @@ Il est composé des portions suivantes:
     1b) Établissement des variables d'extraction et de sauvegarde des données
     1c) Détermination des réductions de composantes souhaitées
     1d) Importation et assignation du jeu de données en jeux de tests et d'entraînement
-    1e) Échantillonnage (90 000 rangées) des variables d'essaie et de test
+    1e) Échantillonnage (180 000 rangées) des variables d'essaie et de test
 2) Construction du réseau de neurones 
 
 Historique:
@@ -36,7 +36,7 @@ networkSavePath = r'K:\27000\_Projet_Information_de_gestion\Analytique\Intellige
 # 1c) Détermination des réductions de composantes souhaitées et paramètres
 # du réseau neuronal
 composantesReduites = [2, 4, 8, 12, 18, 24, 36, 42, 83, 166]
-batch_size = 10 # Mettre une puissance de 2 optimiser sur GPU
+batch_size = 65536 # Mettre une puissance de 2 optimiser sur GPU
 epochs = 400
 loss = 'mean_squared_error'
 
@@ -50,14 +50,14 @@ f.close()
 
 
 #%%
-# 1e) Échantillonnage (180 000 rangées) des variables d'essaie et de test
+'''# 1e) Échantillonnage (180 000 rangées) des variables d'essaie et de test
 Xs_train = Xs_train.sample(n=1800, random_state=42)
 Y_train = Y_train.sample(n=1800, random_state=42)
 Xs_test = Xs_test.sample(n=1800, random_state=42)
 Y_test = Y_test.sample(n=180000, random_state=42)
 
 
-print('Fin partie 1')
+print('Fin partie 1')'''
 
 
 #%%
@@ -81,7 +81,7 @@ def get_compiled_model(dimensions=100):
 # 2b) Application du réseau sur chaque choix de réduction de composante
 for middleLayer in composantesReduites:
     model = get_compiled_model(dimensions=middleLayer)
-    es = keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', min_delta=0.001, verbose=1, patience=20)
+    es = keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', min_delta=0.005, verbose=1, patience=8)
     savePath = networkSavePath + str(middleLayer) + 'dimensions.h5'
     mc = keras.callbacks.ModelCheckpoint(savePath, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
     history = model.fit(Xs_train, Xs_train, validation_split=0.15, batch_size=batch_size, epochs=epochs, callbacks=[es, mc])
